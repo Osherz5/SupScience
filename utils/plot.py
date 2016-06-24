@@ -27,8 +27,22 @@ def hist(data, **kwargs):
 
 	bar([i[1] for i in czip], names=[i[0] for i in czip], **kwargs)
 
-def pie():
-	pass
+def pie(data, labels=None, legend=True, legend_title=None, axis="equal", **kwargs):
+	if labels:
+		plt.pie(data, labels=labels)
+	else:
+		plt.pie(data)
+
+	if legend:
+		if legend_title:
+			plt.legend(title=legend_title)
+		else:
+			plt.legend()
+			
+	if axis:
+		plt.axis(axis)	
+
+	plt.show()
 
 def bar(data, names=None, color="blue", title=None):
 	# create a bar 
