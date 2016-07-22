@@ -1,5 +1,7 @@
 import re
+import time
 import utils
+import string
 import matplotlib.pyplot as plt
 
 from collections import Counter
@@ -20,6 +22,20 @@ class Text(object):
 	# hebrew[-1] = \xd7\xaa
 	# hebrew[-1] = \u05ea
 	WORDS_PATTERN = re.compile("[a-zA-Z\u05d0-\u05ea]+")
+
+	PUNCTUATIONS_PATTERN = re.compile(
+		'['
+		 +
+		''.join([
+			'\\' + i
+			for i in
+			string.punctuation
+		])
+		 +
+		"]+"
+	)
+
+	NUMBER_PATTERN = re.compile("[0-9]+")
 		
 	# H = "\xd7\x97"
 	H = "\u05d7"
@@ -85,7 +101,8 @@ class Data(object):
 			date, rest = i.split(" - ", 1)
 			if ':' in rest:
 				user, message = rest.split(": ", 1)
-				message_type = 1 if message == "<Media omitted>" else 0
+				# message_type = 1 if message == "<Media omitted>" else 0
+				message_type = int(message == "<Media omitted>")
 			else:
 				user = "system"
 				message = rest
@@ -194,6 +211,32 @@ class Data(object):
 		)
 		return self.messages_by_user
 
+	def get_messages(self, message_filter):
+		if "__call__" in dir(message_filter):
+			filter_function = message_filter
+		else:
+			elif "findall" in dir(message_filter):
+				re_pattern = message_filter
+			elif type(message_filter) is str:
+				re_pattern = re.compile(message_filter)
+			elif type(message_filter) is bytes:
+				re_pattern = re.compile(message_filter.decode("utf8"))
+			else:
+				return(bool(print("Unknown message_filter type")))
+
+			filter_function = lambda x: len(re_pattern.findall( x[3] ))
+
+		return list(filter(
+			filter_function,
+			self.lines
+		))
+
+	def get_following_messages(self, filter_function, amount=10, stop_after_another=True, exclude_function=None):
+		result = []
+		for index, i in self.lines:
+			if filter_function(i):
+				pass
+
 	###############################################
 	############         WORDS         ############
 	###############################################
@@ -277,36 +320,92 @@ class Data(object):
 		else:
 			return words
 
+	###############################################
+	############         EMOJIS        ############
+	###############################################
+
+	def get_non_letters(data):
+		words = '\n'.join(data.messages_by_user_combined)
+		words = re.sub(Text.WORDS_PATTERN, '', words)
+		words = re.sub(Text.PUNCTUATIONS_PATTERN, '', words)
+		words = re.sub(Text.NUMBER_PATTERN, '', words)
+		return words
+	
+
 ###############################################
 ############        EXAMPLES       ############
 ###############################################
 
-def plot_h(data, users_names=None, hpm=True):
-	if not users_names:
-		users_names = data.users
-	utils.plot.bar(
-		user_hpm if hpm else user_hpd, # data
-		names=users_names,
-		title="H / message" if hpm else "H / data"
-	)
-
-def plot_messages(data, pie=True, media=False):
-	# fd = filtered data
-	fd = self.user_media_amount if media else self.user_media_amount
-
-	if pie:
-		utils.plot.pie(fd, labels=data.users, legend_title="users")
-	else:
-		utils.plot.bar(fd, names=data.users)
-
 def plot_words(words, amount=15):
 	utils.plot.hist(words, sort=lambda x: x[1], amount=amount, map=lambda x: [x[0].decode("utf8")[::-1], x[1]])
+
+def whos_the_funniest(data):
+	def is_media(x):
+		return x[-1] == 1
+	def is_same_user(x,y):
+		return x[2] == y[2]
+
+	# get all the media messages
+	all_media = data.get_following_messages(is_media, exclude_function=is_same_user)
+
+	# reformat for our needs (the media message, all the following messages combined)
+	all_media_formatter = [
+		(
+			i[0],
+			'\n'.join([j[3] for j in i[1]])
+		)
+		for i in all_media
+	]
+
+	media_h_amount = [
+		(
+			i[0],
+			sum( # get the total amount of H
+				map( # count amount per result of findall
+					len, # count amount of H
+					Text.H_PATTERN.findall(i[1]) # get H out of all the messages
+				)
+			)
+		)
+		for i in all_media_formatter
+	]
+
+	user_h_per_media = [
+		( # amount of H
+			float( # of precise devision
+				sum( # total amount of H
+					map( # get only amount of H from each message
+						lambda x: x[1],
+						filter( # filter only messages by the user
+							lambda x: x[0][2] == u,
+							media_h_amount
+						)
+					)
+				)
+			)
+		)
+		 /
+		( # amount of messages by the user
+			len( # count amount of messages
+				list(filter( # filter only messages by the user
+					lambda x: x[0][2] == u,
+					media_h_amount
+				))
+			)
+		)
+		for u in data._users
+	]
+
+	utils.plot.bar(user_h_per_media, data._users_first_name)
 
 if __name__ == '__main__':
 	pass
 else:
+	start = time.time()
 	d = Data()
 	d.init_all()
+	print("[*] loaded in %s seconds" % (time.time() - start))
+	del start
 	# data = read_data()
 	# lines = parse_lines(data)
 	# users = get_users(lines)

@@ -11,7 +11,7 @@ def hist(data, **kwargs):
 	# data should be a list
 	# create a dict of how many times each object appears
 	c = Counter(data)
-	czip = zip(c.keys(), c.values())
+	czip = list(zip(c.keys(), c.values()))
 
 	if "sort" in kwargs:
 		czip.sort(key=kwargs["sort"])
@@ -22,7 +22,7 @@ def hist(data, **kwargs):
 		kwargs.pop("amount")
 
 	if "map" in kwargs:
-		czip = map(kwargs["map"], czip)
+		czip = list(map(kwargs["map"], czip))
 		kwargs.pop("map")
 
 	bar([i[1] for i in czip], names=[i[0] for i in czip], **kwargs)
